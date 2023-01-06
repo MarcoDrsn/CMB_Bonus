@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # np.random.seed(110)
-env = simpy.Environment()
 
 passthrough_time = 15
 operation_minutes = 800
@@ -47,59 +46,51 @@ def create_segments_and_paths(env, num_parallel_tracks):
     return segments, segment_paths
 
 
-def train(env, num_parallel_tracks, departure, ID, trains=25, time_per_segement=15):
-    a = np.random.randint(low=1, high=4, size=1)
-    if a[0] < 4:
-        b = np.random.randint(low=a + 1, high=5, size=1)
-    b = np.random.randint(low=a + 1, high=5, size=1)
-
-    segments, segment_paths = create_segments_and_paths(env, num_parallel_tracks)
+def train(env, num_parallel_tracks, departure, ID,segment_paths, trains=25, time_per_segement=15):
 
     yield env.timeout(departure)
 
     start = env.now
-    for track in segment_paths[a[0], b[0]]:
-        t_req = env.now
+    for track in segment_paths:
         with track.request() as seg:
-            # Waiting for Access to the ressource
-            yield seg
-            # Measure delay and add it to the delays list
-            t_wait = env.now - t_req
-            #print(t_wait)
-            # print(t_wait)
-            delays.append(t_wait)
-            yield env.timeout(time_per_segement)
-    end = env.now
-    delay = end - start - 45  # regelzeit 45 min
-    # print(delay)
+            t_req = env.now
 
-    list_of_delays.append(delay)
+            yield seg
+            t_wait = env.now - t_req
+            list_of_delays.append(t_wait)
+
+            yield env.timeout(time_per_segement)
+
+
 
 
 parallel_tracks = list(range(1, 21))
 
 train_ID = 0
 mean_delays = []
-list_of_delays = []
-delays = []
 
-def start_process(env, tracks, dep, train_ID):
-    yield env.process(train(env, tracks, dep, train_ID))
+
+
+
 
 for tracks in parallel_tracks:
+    env = simpy.Environment()
+    list_of_delays = []
+    segments, segment_paths = create_segments_and_paths(env, tracks)
     for dep in earliest_dep:
+        a = np.random.randint(low=1, high=4, size=1)
+        if a[0] < 4:
+            b = np.random.randint(low=a + 1, high=5, size=1)
+        b = np.random.randint(low=a + 1, high=5, size=1)
         train_ID += 1
-        env.process(start_process(env, tracks, dep, train_ID))
+        env.process(train(env, tracks, dep, train_ID,segment_paths[a[0], b[0]]))
+    env.run()
+    mean_delays.append(sum(list_of_delays)/len(list_of_delays))
+
 
     # clear list of delays
-env.run()
 
-help_list = []
-for count in list_of_delays:
-    if len(help_list) == 499:
-        mean_delays.append(sum(help_list)/500)
-        help_list = []
-    help_list.append(count)
+
 
 
 print(f'Total mean delay time is {sum(list_of_delays) / len(list_of_delays)}')
@@ -110,7 +101,7 @@ find_min = min(mean_delays)
 print(len(mean_delays))
 for find in range(len(mean_delays)):
     if mean_delays[find] == find_min:
-        print(f"Min delay of {find_min} with {find-1} tracks in parallel")
+        print(f"Min delay of {find_min} with {find} tracks in parallel")
 
 plt.plot(parallel_tracks, mean_delays)
 plt.scatter(parallel_tracks, mean_delays)
